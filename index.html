@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hack Club Ships City</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --panel: rgba(24, 34, 38, 0.94);
+            --panel-border: rgba(225, 231, 223, 0.16);
+            --text: #f1f1e9;
+            --muted: #bac2bd;
+            --accent: #d7a06e;
+            --success: #94bf9b;
+            --danger: #df8b7c;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: #1c282c;
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: fixed;
+            inset: 0;
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+        }
+
+        #ui {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 10;
+            width: min(320px, calc(100vw - 36px));
+            padding: 15px 18px;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-left: 3px solid var(--accent);
+            border-radius: 7px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+        }
+
+        .brand {
+            font-size: 17px;
+            font-weight: 650;
+        }
+
+        .instructions {
+            margin-top: 7px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        #localRunHelp {
+            margin-top: 9px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        #shipInfo {
+            position: fixed;
+            bottom: 18px;
+            left: 18px;
+            z-index: 10;
+            width: min(360px, calc(100vw - 36px));
+            padding: 16px 18px;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-top: 3px solid var(--accent);
+            border-radius: 7px;
+            font-size: 13px;
+            overflow-wrap: anywhere;
+            display: none;
+        }
+
+        #shipInfo h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            line-height: 1.35;
+        }
+
+        #shipInfo p {
+            margin-top: 5px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        #shipInfo strong {
+            color: var(--text);
+        }
+
+        #stats {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 10;
+            width: min(220px, calc(100vw - 36px));
+            padding: 11px 15px;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 7px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+            font-size: 12px;
+        }
+
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            margin: 6px 0;
+        }
+
+        .stat-label {
+            color: var(--muted);
+        }
+
+        .status-line {
+            justify-content: flex-start;
+            align-items: center;
+            padding-top: 8px;
+            border-top: 1px solid var(--panel-border);
+            color: var(--muted);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            flex: 0 0 7px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        #loadStatus[data-state="live"] + .status-dot {
+            background: var(--success);
+        }
+
+        #loadStatus[data-state="error"] + .status-dot {
+            background: var(--danger);
+        }
+
+        #loadError {
+            margin-top: 8px;
+            color: #f0b4a8;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        #retryButton {
+            margin-top: 9px;
+            padding: 6px 10px;
+            border: 1px solid rgba(215, 160, 110, 0.65);
+            border-radius: 4px;
+            background: rgba(215, 160, 110, 0.12);
+            color: var(--text);
+            font: inherit;
+            cursor: pointer;
+        }
+
+        #retryButton:hover {
+            background: rgba(215, 160, 110, 0.24);
+        }
+
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            z-index: 5;
+            transform: translate(-50%, -50%);
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: rgba(245, 245, 235, 0.8);
+            pointer-events: none;
+        }
+
+        @media (max-width: 560px) {
+            #ui {
+                top: 10px;
+                left: 10px;
+                width: min(260px, calc(100vw - 20px));
+                padding: 12px 14px;
+            }
+
+            #stats {
+                top: auto;
+                right: 10px;
+                bottom: 10px;
+                width: min(190px, calc(100vw - 20px));
+            }
+
+            #shipInfo {
+                bottom: 155px;
+                left: 10px;
+                width: min(260px, calc(100vw - 20px));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="brand">Ships City</div>
+        <p class="instructions">Click the scene to look around. Use WASD or arrow keys to move. Press Esc to release the pointer.</p>
+        <p id="localRunHelp" hidden>This file was opened directly. Run <strong>node server.js</strong> in the project folder, then open the localhost address shown in the terminal.</p>
+    </div>
+
+    <div id="stats">
+        <div class="stat-line"><span class="stat-label">Projects</span><span id="shipCount">0</span></div>
+        <div class="stat-line"><span class="stat-label">Frame rate</span><span><span id="fps">60</span> fps</span></div>
+        <div class="stat-line"><span class="stat-label">Altitude</span><span><span id="altitude">0</span> m</span></div>
+        <div class="stat-line status-line"><span id="loadStatus" data-state="loading">Connecting to local server...</span><span class="status-dot" aria-hidden="true"></span></div>
+        <p id="loadError" hidden></p>
+        <button id="retryButton" type="button" hidden>Retry connection</button>
+    </div>
+
+    <div id="shipInfo">
+        <h3 id="shipName"></h3>
+        <p><strong>Built by:</strong> <span id="shipAuthor"></span></p>
+        <p><strong>Program:</strong> <span id="shipHack"></span></p>
+        <p><strong>Country:</strong> <span id="shipCountry"></span></p>
+        <p><strong>Hours:</strong> <span id="shipHours"></span></p>
+    </div>
+
+    <div class="crosshair"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/three@0.128.0/build/three.min.js';"></script>
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.getElementById('loadStatus').textContent = '3D library unavailable';
+            document.getElementById('loadStatus').dataset.state = 'error';
+            throw new Error('Three.js could not be loaded. Check your internet connection.');
+        }
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1c282c);
+        scene.fog = new THREE.Fog(0x1c282c, 550, 1800);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        camera.position.set(0, 14, 70);
+        camera.lookAt(0, 10, 0);
+
+        let renderer;
+        try {
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+        } catch (error) {
+            document.getElementById('loadStatus').textContent = '3D graphics unavailable';
+            document.getElementById('loadStatus').dataset.state = 'error';
+            throw error;
+        }
+        renderer.domElement.id = 'canvas';
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = false;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xc5d0c6, 0.9);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffdfb8, 1.2);
+        directionalLight.position.set(100, 100, 50);
+        scene.add(directionalLight);
+
+        // Ground
+        const groundGeom = new THREE.PlaneGeometry(1000, 1000);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x35413d, roughness: 0.95 });
+        const ground = new THREE.Mesh(groundGeom, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Grid for the ground
+        const gridHelper = new THREE.GridHelper(1000, 50, 0x738176, 0x414c45);
+        gridHelper.position.y = 0.1;
+        scene.add(gridHelper);
+
+        // Controls
+        const keys = {};
+        const mousePos = { x: 0, y: -0.055 };
+        let locked = false;
+        const velocity = new THREE.Vector3();
+        const playerSpeed = 0.3;
+        const playerJump = 0.8;
+
+        document.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+        document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        document.addEventListener('click', (event) => {
+            if (event.target === renderer.domElement && !document.pointerLockElement) {
+                renderer.domElement.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            locked = document.pointerLockElement !== null;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!locked) return;
+            mousePos.x += e.movementX * 0.003;
+            mousePos.y += e.movementY * 0.003;
+            mousePos.y = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, mousePos.y));
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const shipsData = {};
+        const buildings = [];
+
+        document.addEventListener('click', (event) => {
+            if (event.button !== 0 || event.target !== renderer.domElement) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(buildings);
+
+            if (intersects.length > 0) {
+                const building = intersects[0].object;
+                const shipData = shipsData[building.userData.shipId];
+                if (shipData) {
+                    displayShipInfo(shipData);
+                }
+            } else {
+                document.getElementById('shipInfo').style.display = 'none';
+            }
+        });
+
+        function displayShipInfo(ship) {
+            const description = ship.description?.trim();
+            document.getElementById('shipName').textContent = description?.split(/\r?\n/)[0] || ship.ysws || 'Unnamed project';
+            document.getElementById('shipAuthor').textContent = ship.github_username || 'Unknown';
+            document.getElementById('shipHack').textContent = ship.ysws || 'N/A';
+            document.getElementById('shipCountry').textContent = ship.country || 'Unknown';
+            document.getElementById('shipHours').textContent = ship.hours ?? 'N/A';
+            document.getElementById('shipInfo').style.display = 'block';
+        }
+
+        // A building for each ship :3
+        function createBuilding(ship, index) {
+            const hash = Array.from(ship.id).reduce((value, character) => value + character.charCodeAt(0), 0);
+            const angle = index * 137.508 * Math.PI / 180;
+            const distance = 28 + index * 2.5;
+            const x = Math.cos(angle) * distance;
+            const z = Math.sin(angle) * distance;
+
+            const height = 18 + ((hash % 100) / 100) * 38;
+            const width = 6 + ((hash % 50) / 50) * 5;
+            const depth = 6 + (((hash * 7) % 50) / 50) * 5;
+
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            
+            const palette = [0x74847b, 0x9a806a, 0x758692, 0x8d8b72];
+            const color = palette[hash % palette.length];
+            const material = new THREE.MeshStandardMaterial({
+                color: color,
+                metalness: 0.08,
+                roughness: 0.82
+            });
+
+            const building = new THREE.Mesh(geometry, material);
+            building.position.set(x, height / 2, z);
+            building.userData.shipId = ship.id;
+
+            // Add windows
+            const windowGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.2);
+            const windowMaterial = new THREE.MeshStandardMaterial({
+                color: 0xe7c48e,
+                emissive: 0xb5803c,
+                emissiveIntensity: 0.35
+            });
+
+            const windowPositions = [];
+            for (let h = 1; h < height; h += 2) {
+                for (let w = -width / 2 + 1; w < width / 2; w += 2) {
+                    windowPositions.push([w, h - height / 2, depth / 2 + 0.15]);
+                }
+            }
+
+            const windows = new THREE.InstancedMesh(windowGeometry, windowMaterial, windowPositions.length);
+            const windowTransform = new THREE.Object3D();
+            windowPositions.forEach(([windowX, windowY, windowZ], windowIndex) => {
+                windowTransform.position.set(windowX, windowY, windowZ);
+                windowTransform.updateMatrix();
+                windows.setMatrixAt(windowIndex, windowTransform.matrix);
+            });
+            windows.instanceMatrix.needsUpdate = true;
+            building.add(windows);
+
+            scene.add(building);
+            buildings.push(building);
+            shipsData[ship.id] = ship;
+        }
+
+        const projectCacheKey = 'hackcity.projects.v1';
+
+        function getCachedProjects() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(projectCacheKey));
+                if (Array.isArray(cached?.projects) && Number.isInteger(cached.total)) {
+                    return cached;
+                }
+            } catch (error) {
+                console.warn('Could not read the saved project list:', error);
+            }
+            return null;
+        }
+
+        function saveCachedProjects(projects, total) {
+            try {
+                const snapshot = projects.slice(0, 100).map(({ id, description, github_username, ysws, country, hours }) => ({
+                    id, description, github_username, ysws, country, hours
+                }));
+                localStorage.setItem(projectCacheKey, JSON.stringify({ projects: snapshot, total }));
+            } catch (error) {
+                console.warn('Could not save the project list for offline use:', error);
+            }
+        }
+
+        async function fetchProjects() {
+            let lastError;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 12000);
+                try {
+                    const response = await fetch('/api/projects', {
+                        signal: controller.signal,
+                        cache: 'no-store'
+                    });
+                    if (!response.ok) {
+                        const errorBody = await response.json().catch(() => ({}));
+                        throw new Error(errorBody.error || `Local server returned HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (!Array.isArray(data.projects) || !Number.isInteger(data.total)) {
+                        throw new Error('Ships API returned an unexpected response format');
+                    }
+                    return {
+                        projects: data.projects.filter(project => typeof project?.id === 'string' && project.id.length > 0),
+                        total: data.total,
+                        source: response.headers.get('x-data-source') || 'live'
+                    };
+                } catch (error) {
+                    lastError = error;
+                    if (attempt < 2) {
+                        await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+                    }
+                } finally {
+                    clearTimeout(timeout);
+                }
+            }
+            throw lastError;
+        }
+
+        function showProjects(projects, total, status) {
+            buildings.forEach(building => {
+                scene.remove(building);
+                building.geometry.dispose();
+                building.material.dispose();
+                building.children.forEach(child => {
+                    child.geometry.dispose();
+                    child.material.dispose();
+                });
+            });
+            buildings.length = 0;
+            Object.keys(shipsData).forEach(id => delete shipsData[id]);
+            document.getElementById('shipCount').textContent = total;
+            document.getElementById('loadStatus').textContent = status;
+            document.getElementById('loadStatus').dataset.state = status === 'Live data' ? 'live' : 'saved';
+            document.getElementById('loadError').hidden = true;
+            document.getElementById('retryButton').hidden = true;
+            projects.slice(0, 100).forEach((project, index) => {
+                try {
+                    createBuilding(project, index);
+                } catch (error) {
+                    console.warn(`Could not create a building for project ${project.id}:`, error);
+                }
+            });
+        }
+
+        async function loadShips() {
+            try {
+                const result = await fetchProjects();
+                saveCachedProjects(result.projects, result.total);
+                showProjects(result.projects, result.total, result.source === 'live' ? 'Live data' : 'Saved server data');
+            } catch (error) {
+                console.error('Failed to load projects from the Ships API:', error);
+                const cached = getCachedProjects();
+                if (cached) {
+                    showProjects(cached.projects, cached.total, 'Saved data (API unavailable)');
+                    document.getElementById('retryButton').hidden = false;
+                    return;
+                }
+                const loadStatus = document.getElementById('loadStatus');
+                loadStatus.textContent = location.protocol === 'file:' ? 'Local server required' : 'Projects unavailable';
+                loadStatus.dataset.state = 'error';
+                const loadError = document.getElementById('loadError');
+                loadError.textContent = location.protocol === 'file:'
+                    ? 'Open this page through the local server to load project data.'
+                    : error.message;
+                loadError.hidden = false;
+                document.getElementById('retryButton').hidden = location.protocol === 'file:';
+            }
+        }
+
+        document.getElementById('retryButton').addEventListener('click', async () => {
+            const retryButton = document.getElementById('retryButton');
+            retryButton.disabled = true;
+            retryButton.textContent = 'Retrying...';
+            await loadShips();
+            retryButton.disabled = false;
+            retryButton.textContent = 'Retry connection';
+        });
+
+        // Camera update
+        function updateCamera() {
+            const forward = new THREE.Vector3();
+            forward.setFromMatrixColumn(camera.matrix, 0);
+            forward.crossVectors(camera.up, forward);
+
+            const right = new THREE.Vector3();
+            right.setFromMatrixColumn(camera.matrix, 0);
+
+            if (keys['w'] || keys['arrowup']) {
+                velocity.add(forward.multiplyScalar(playerSpeed));
+            }
+            if (keys['s'] || keys['arrowdown']) {
+                velocity.add(forward.multiplyScalar(-playerSpeed));
+            }
+            if (keys['a'] || keys['arrowleft']) {
+                velocity.add(right.multiplyScalar(-playerSpeed));
+            }
+            if (keys['d'] || keys['arrowright']) {
+                velocity.add(right.multiplyScalar(playerSpeed));
+            }
+
+            camera.position.add(velocity);
+            velocity.multiplyScalar(0.85);
+
+            // Keep the camera above the ground 
+            if (camera.position.y < 2) {
+                camera.position.y = 2;
+                if (keys[' ']) {
+                    velocity.y = playerJump;
+                }
+            } else if (camera.position.y > 2) {
+                velocity.y -= 0.02; // Gravity
+            }
+
+            // Apply rotations
+            const euler = new THREE.Euler(mousePos.y, mousePos.x, 0, 'YXZ');
+            camera.quaternion.setFromEuler(euler);
+
+            document.getElementById('altitude').textContent = Math.max(0, Math.round(camera.position.y - 2));
+        }
+
+        // Animation loop
+        const clock = new THREE.Clock();
+        let frameCount = 0;
+        let lastTime = Date.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            updateCamera();
+            renderer.render(scene, camera);
+
+            frameCount++;
+            const currentTime = Date.now();
+            if (currentTime - lastTime >= 1000) {
+                document.getElementById('fps').textContent = frameCount;
+                frameCount = 0;
+                lastTime = currentTime;
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        if (location.protocol === 'file:') {
+            document.getElementById('localRunHelp').hidden = false;
+        }
+        loadShips();
+        animate();
+    </script>
+</body>
+</html>

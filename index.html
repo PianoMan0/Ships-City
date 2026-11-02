@@ -375,14 +375,15 @@
         }
 
         // A building for each ship :3
-        function createBuilding(ship, index) {
+        function createBuilding(ship, index, maxHours) {
             const hash = Array.from(ship.id).reduce((value, character) => value + character.charCodeAt(0), 0);
             const angle = index * 137.508 * Math.PI / 180;
             const distance = 28 + index * 2.5;
             const x = Math.cos(angle) * distance;
             const z = Math.sin(angle) * distance;
 
-            const height = 18 + ((hash % 100) / 100) * 38;
+            const hours = Number.isFinite(ship.hours) ? Math.max(0, ship.hours) : 0;
+            const height = 18 + (maxHours > 0 ? (hours / maxHours) * 38 : 0);
             const width = 6 + ((hash % 50) / 50) * 5;
             const depth = 6 + (((hash * 7) % 50) / 50) * 5;
 
@@ -508,9 +509,13 @@
             document.getElementById('loadStatus').dataset.state = status === 'Live data' ? 'live' : 'saved';
             document.getElementById('loadError').hidden = true;
             document.getElementById('retryButton').hidden = true;
-            projects.slice(0, 100).forEach((project, index) => {
+            const visibleProjects = projects.slice(0, 100);
+            const maxHours = visibleProjects.reduce((maximum, project) => (
+                Math.max(maximum, Number.isFinite(project.hours) ? project.hours : 0)
+            ), 0);
+            visibleProjects.forEach((project, index) => {
                 try {
-                    createBuilding(project, index);
+                    createBuilding(project, index, maxHours);
                 } catch (error) {
                     console.warn(`Could not create a building for project ${project.id}:`, error);
                 }
